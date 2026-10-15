@@ -447,6 +447,7 @@ server = FastMCP(
         "and official search links. Public index values are not checkout prices; "
         "always preserve platform, SKU, observation time, freshness, and confidence."
     ),
+    stateless_http=True,
 )
 
 READ_ONLY_OPEN = ToolAnnotations(

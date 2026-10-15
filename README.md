@@ -1,6 +1,6 @@
 # 中国电商免登录搜索 MCP
 
-一个纯 HTTP、只读、无需登录的 MCP 服务，支持：
+一个纯 Python、只读、无需登录的 MCP 服务，支持：
 
 - 拼多多（pdd）
 - 京东（jd）
@@ -77,6 +77,65 @@ python3 -m pip install -r requirements.txt
 python3 server.py --live-test "150元以内 游戏 静音鼠标"
 ~~~
 
+## VPS 部署（Docker + Caddy）
+
+生产环境使用 Streamable HTTP，端点为 `/mcp`。默认必须配置固定 Bearer Token；
+只有明确设置 `MCP_ALLOW_ANONYMOUS=1` 才允许匿名访问。
+
+前置条件：VPS 已安装 Git、Docker Engine、Docker Compose 插件和 Caddy，并有一个
+已解析到该 VPS 的域名。
+
+### 1. 启动容器
+
+~~~bash
+git clone https://github.com/Subwoofer91/cn-ecommerce-mcp.git
+cd cn-ecommerce-mcp
+
+TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+printf 'MCP_ACCESS_TOKEN=%s\nMCP_HOST=0.0.0.0\nMCP_PORT=8000\nMCP_LOG_LEVEL=info\n' "$TOKEN" > .env
+
+docker compose up -d --build
+curl http://127.0.0.1:8000/healthz
+~~~
+
+`compose.yaml` 只把 8000 端口绑定到 VPS 的 `127.0.0.1`，不要直接将该端口暴露到公网。
+
+### 2. 配置 HTTPS 反向代理
+
+将 `deploy/Caddyfile.example` 中的 `mcp.example.com` 替换为你的域名，并确保该域名的
+DNS A/AAAA 记录指向 VPS。把配置加入 Caddy 后重载：
+
+~~~bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+~~~
+
+防火墙只需要对公网开放 80/443。最终 MCP 地址为：
+
+~~~text
+https://mcp.example.com/mcp
+~~~
+
+### 3. 从 Codex 连接
+
+在运行 Codex 的机器上设置同一个令牌，然后注册远程 MCP：
+
+~~~bash
+export CN_ECOMMERCE_MCP_TOKEN='替换为 .env 中的 MCP_ACCESS_TOKEN'
+codex mcp add cn-ecommerce-remote \
+  --url https://mcp.example.com/mcp \
+  --bearer-token-env-var CN_ECOMMERCE_MCP_TOKEN
+~~~
+
+确认连接：
+
+~~~bash
+codex mcp list
+~~~
+
+如果服务只供你自己使用，请保留 Bearer Token。公开匿名服务容易被滥用，并可能导致
+上游公开搜索源限流。
+
 ## Codex 注册
 
 将路径替换为本机仓库中的 `server.py`：
@@ -92,3 +151,7 @@ codex mcp add cn-ecommerce -- python3 /path/to/cn-ecommerce-mcp/server.py
 ~~~
 
 修改后需开启新聊天或重启 Codex，让现有 MCP 进程重新加载代码。
+
+## License
+
+[MIT](LICENSE)

@@ -8,5 +8,6 @@ __pycache__/
 htmlcov/
 .env
 .env.*
+!.env.example
 .venv/
 venv/
